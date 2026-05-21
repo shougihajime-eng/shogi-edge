@@ -18,7 +18,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const out = await generateWeeklyReflection();
+    // テスト用: ?date=YYYY-MM-DD を指定すると、その日を含む週を対象にする
+    const url = new URL(req.url);
+    const dateParam = url.searchParams.get("date");
+    const referenceDate = dateParam ? new Date(dateParam) : new Date();
+    const out = await generateWeeklyReflection(referenceDate);
     if (!out) {
       return NextResponse.json({ ok: true, message: "no data" });
     }

@@ -17,7 +17,10 @@ export async function GET(req: Request) {
   }
 
   try {
-    const out = await generateMonthlyReflection();
+    const url = new URL(req.url);
+    const dateParam = url.searchParams.get("date");
+    const referenceDate = dateParam ? new Date(dateParam) : new Date();
+    const out = await generateMonthlyReflection(referenceDate);
     if (!out) {
       return NextResponse.json({ ok: true, message: "no data" });
     }
