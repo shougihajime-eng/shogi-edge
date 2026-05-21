@@ -9,6 +9,11 @@ import { OpeningDistribution } from "@/components/OpeningDistribution";
 import { HeadToHeadList } from "@/components/HeadToHeadList";
 import { YouTubeTools } from "@/components/YouTubeTools";
 import { loadInputForMatch, loadLatestPrediction } from "@/lib/prediction/repository";
+import { loadReflectionByMatch } from "@/lib/reflection/repository";
+import {
+  MatchReflectionCard,
+  ResultAnswerKey,
+} from "@/components/ReflectionCard";
 import { buildYouTubeScript, buildThumbnailHooks } from "@/lib/llm/summary";
 import { formatDateJa, formatTime } from "@/lib/utils";
 
@@ -27,8 +32,15 @@ export default async function MatchPage({
     notFound();
   }
   const prediction = await loadLatestPrediction(id);
+  const reflection = await loadReflectionByMatch(id);
 
   const { match, player_a, player_b, stats_a, stats_b, head_to_heads } = data;
+  const actualWinner =
+    match.status === "finished" && match.result_winner_id
+      ? match.result_winner_id === player_a.id
+        ? player_a
+        : player_b
+      : null;
 
   return (
     <PageShell>
@@ -90,6 +102,41 @@ export default async function MatchPage({
         </section>
       ) : (
         <NoPrediction matchId={match.id} />
+      )}
+
+      {/* 終局済みなら結果バナーと振り返り */}
+      {actualWinner && (
+        <section className="mb-8 rounded-2xl border border-ai-700/40 bg-ai-900/40 p-5">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <p className="mb-1 text-[10px] uppercase tracking-[0.3em] text-ai-300">
+                final result
+              </p>
+              <p className="font-name text-2xl text-washi-100">
+                {actualWinner.name} 勝ち
+              </p>
+            </div>
+            {prediction && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-num ${
+                  prediction.predicted_winner_id === actualWinner.id
+                    ? "bg-ai-700/40 text-ai-300"
+                    : "bg-shu-500/20 text-shu-300"
+                }`}
+              >
+                予想:{" "}
+                {prediction.predicted_winner_id === actualWinner.id ? "的中" : "外れ"}
+              </span>
+            )}
+          </div>
+        </section>
+      )}
+
+      {reflection && (
+        <div className="mb-8 grid gap-6 md:grid-cols-2">
+          <MatchReflectionCard reflection={reflection} />
+          <ResultAnswerKey reflection={reflection} />
+        </div>
       )}
 
       <div className="grid gap-6 md:grid-cols-2">

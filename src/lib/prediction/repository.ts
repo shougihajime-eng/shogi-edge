@@ -12,6 +12,11 @@ import type {
 } from "@/types/db";
 import { DEFAULT_WEIGHTS, predict } from "./engine";
 import { generateSummary } from "@/lib/llm/summary";
+import {
+  buildPatternKeysFromInputs,
+  calcConfidencePenalty,
+  expectedOpeningsFromHeadToHead,
+} from "@/lib/reflection/weakness";
 
 // 予想に必要な全データを 1 マッチについて読む
 export async function loadInputForMatch(matchId: string) {
@@ -86,10 +91,23 @@ export async function loadLatestWeights(): Promise<WeightSet> {
 }
 
 // 予想を生成して predictions に upsert
+// 弱点パターンDB に登録のあるパターンに該当する場合は信頼度を下げる
 export async function regeneratePrediction(matchId: string): Promise<Prediction> {
   const input = await loadInputForMatch(matchId);
   const weights = await loadLatestWeights();
   const out = predict({ ...input, weights });
+
+  // 弱点パターン → 信頼度ペナルティ (★を下げる)
+  const expectedOpenings = expectedOpeningsFromHeadToHead(input.head_to_heads);
+  const patternKeys = buildPatternKeysFromInputs({
+    match: input.match,
+    player_a: input.player_a,
+    player_b: input.player_b,
+    expected_openings:
+      Object.keys(expectedOpenings).length > 0 ? expectedOpenings : null,
+  });
+  const { penalty } = await calcConfidencePenalty({ patternKeys });
+  const adjustedConfidence = Math.max(1, out.confidence - penalty);
 
   const summary = await generateSummary({
     player_a_name: input.player_a.name,
@@ -97,7 +115,7 @@ export async function regeneratePrediction(matchId: string): Promise<Prediction>
     win_prob_a: out.win_prob_a,
     win_prob_b: out.win_prob_b,
     reasoning_seed: out.summary_seed,
-    confidence: out.confidence,
+    confidence: adjustedConfidence,
   });
 
   const admin = createAdminSupabase();
@@ -108,7 +126,7 @@ export async function regeneratePrediction(matchId: string): Promise<Prediction>
       predicted_winner_id: out.predicted_winner_id,
       win_prob_a: out.win_prob_a,
       win_prob_b: out.win_prob_b,
-      confidence: out.confidence,
+      confidence: adjustedConfidence,
       summary,
       reasoning_json: out.reasoning_json,
       expected_openings: out.expected_openings,
@@ -133,7 +151,7 @@ export async function loadLatestPrediction(matchId: string): Promise<Prediction 
   return (data as unknown as Prediction) ?? null;
 }
 
-// 対局結果を確定 → 予想結果を記録
+// 対局結果を確定 → 予想結果を記録 + 振り返り自動生成 + 弱点パターン更新
 export async function finalizeMatchResult(matchId: string, winnerId: string) {
   const admin = createAdminSupabase();
   const { error: e1 } = await admin
@@ -157,5 +175,14 @@ export async function finalizeMatchResult(matchId: string, winnerId: string) {
       },
       { onConflict: "prediction_id" },
     );
+  }
+
+  // 振り返り自動生成 + 弱点パターン更新 (循環参照回避のため動的 import)
+  try {
+    const { reflectOnFinishedMatch } = await import("@/lib/reflection/repository");
+    await reflectOnFinishedMatch(matchId, winnerId);
+  } catch (err) {
+    console.error("[reflection] generation failed for", matchId, err);
+    // 振り返り失敗は致命傷ではない — メインフローは続行
   }
 }

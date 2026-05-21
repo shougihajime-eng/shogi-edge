@@ -277,3 +277,185 @@ export async function deleteAmateur(formData: FormData) {
 export async function navigateTo(path: string) {
   redirect(path);
 }
+
+// ---------------------- Reflections ----------------------
+export async function generateWeeklyNow(formData: FormData) {
+  await requireAdmin();
+  const dateStr = String(formData.get("date") ?? "");
+  const date = dateStr ? new Date(dateStr) : new Date();
+  const { generateWeeklyReflection } = await import("@/lib/reflection/aggregate");
+  await generateWeeklyReflection(date);
+  revalidatePath("/admin/reflections");
+}
+
+export async function generateMonthlyNow(formData: FormData) {
+  await requireAdmin();
+  const dateStr = String(formData.get("date") ?? "");
+  const date = dateStr ? new Date(dateStr) : new Date();
+  const { generateMonthlyReflection } = await import("@/lib/reflection/aggregate");
+  await generateMonthlyReflection(date);
+  revalidatePath("/admin/reflections");
+}
+
+export async function approveProposal(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const { approveMonthlyProposal } = await import("@/lib/reflection/repository");
+  await approveMonthlyProposal(id);
+  revalidatePath("/admin/reflections");
+  revalidatePath("/admin/weights");
+}
+
+export async function rejectProposal(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const { rejectMonthlyProposal } = await import("@/lib/reflection/repository");
+  await rejectMonthlyProposal(id);
+  revalidatePath("/admin/reflections");
+}
+
+export async function regenerateMatchReflection(formData: FormData) {
+  await requireAdmin();
+  const predictionId = String(formData.get("prediction_id") ?? "");
+  const { regenerateMatchReflectionById } = await import("@/lib/reflection/repository");
+  await regenerateMatchReflectionById(predictionId);
+  revalidatePath("/admin/reflections");
+}
+
+// ---------------------- CSV bulk import ----------------------
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    // 簡易: ダブルクォート対応の CSV パース
+    const out: string[] = [];
+    let cur = "";
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQ) {
+        if (c === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else if (c === '"') {
+          inQ = false;
+        } else {
+          cur += c;
+        }
+      } else if (c === ",") {
+        out.push(cur);
+        cur = "";
+      } else if (c === '"' && cur === "") {
+        inQ = true;
+      } else {
+        cur += c;
+      }
+    }
+    out.push(cur);
+    rows.push(out.map((s) => s.trim()));
+  }
+  return rows;
+}
+
+export interface ImportResult {
+  added: number;
+  updated: number;
+  errors: { row: number; line: string; reason: string }[];
+}
+
+export async function bulkImportPlayers(formData: FormData): Promise<ImportResult> {
+  await requireAdmin();
+  const text = String(formData.get("csv") ?? "");
+  const rows = parseCsv(text);
+  const sb = createAdminSupabase();
+  const result: ImportResult = { added: 0, updated: 0, errors: [] };
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const [name, kanji_name, rank, region, master, rating, notes] = r;
+    if (!name) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: "name 空" });
+      continue;
+    }
+    const payload = {
+      name,
+      kanji_name: kanji_name || name,
+      rank: rank || "四段",
+      region: region === "tokyo" || region === "kansai" ? region : null,
+      master: master || null,
+      rating: rating ? Number(rating) : 1500,
+      notes: notes || null,
+    };
+    if (Number.isNaN(payload.rating)) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: "rating 数値ではない" });
+      continue;
+    }
+    const { error } = await sb
+      .from("players")
+      .upsert(payload, { onConflict: "name,kanji_name" });
+    if (error) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: error.message });
+    } else {
+      result.added += 1;
+    }
+  }
+  revalidatePath("/admin/players");
+  revalidatePath("/players");
+  return result;
+}
+
+export async function bulkImportHeadToHead(formData: FormData): Promise<ImportResult> {
+  await requireAdmin();
+  const text = String(formData.get("csv") ?? "");
+  const rows = parseCsv(text);
+  const sb = createAdminSupabase();
+  // 名前→ID マップを事前ロード
+  const { data: players } = await sb.from("players").select("id, name");
+  const nameToId = new Map(
+    ((players ?? []) as { id: string; name: string }[]).map((p) => [p.name, p.id]),
+  );
+
+  const result: ImportResult = { added: 0, updated: 0, errors: [] };
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const [match_date, a_name, b_name, tournament, opening, winner_name, kifu_url] = r;
+    if (!match_date || !a_name || !b_name) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: "必須項目欠落" });
+      continue;
+    }
+    const a_id = nameToId.get(a_name);
+    const b_id = nameToId.get(b_name);
+    if (!a_id) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: `棋士 "${a_name}" 未登録` });
+      continue;
+    }
+    if (!b_id) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: `棋士 "${b_name}" 未登録` });
+      continue;
+    }
+    const winner_id = winner_name ? nameToId.get(winner_name) : null;
+    if (winner_name && !winner_id) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: `勝者 "${winner_name}" 未登録` });
+      continue;
+    }
+    const { error } = await sb.from("head_to_head").insert({
+      match_date,
+      player_a_id: a_id,
+      player_b_id: b_id,
+      tournament: tournament || null,
+      opening: opening || null,
+      winner_id: winner_id || null,
+      kifu_url: kifu_url || null,
+    });
+    if (error) {
+      result.errors.push({ row: i + 1, line: r.join(","), reason: error.message });
+    } else {
+      result.added += 1;
+    }
+  }
+  revalidatePath("/admin/head-to-head");
+  return result;
+}

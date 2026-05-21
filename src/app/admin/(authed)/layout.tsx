@@ -10,7 +10,9 @@ const nav = [
   { href: "/admin/player-stats", label: "成績入力" },
   { href: "/admin/results", label: "結果確定" },
   { href: "/admin/weights", label: "重み調整" },
+  { href: "/admin/reflections", label: "振り返り" },
   { href: "/admin/amateurs", label: "アマ選手" },
+  { href: "/admin/import", label: "CSV一括取込" },
   { href: "/admin/scraper-status", label: "自動取得状況" },
 ];
 

@@ -191,6 +191,108 @@ export interface AmateurResult {
   notes: string | null;
 }
 
+// =============================================================
+// 0002: 自己学習・振り返り機能 (仕様書 §9)
+// =============================================================
+
+// 7要素のうちどれが正しい/誤った信号を出していたか
+export interface FactorAttribution {
+  factor: string;            // 「レーティング差」「戦型相性」など
+  had_correct_signal: boolean;
+  weight: number;            // その時の重み (0〜1)
+  impact_num: number;        // -1〜+1 (a視点)
+}
+
+export interface MatchReflection {
+  id: string;
+  match_id: string;
+  prediction_id: string;
+  predicted_winner_id: string;
+  actual_winner_id: string;
+  is_correct: boolean;
+  result_summary: string;
+  honest_review: string;
+  lesson_learned: string;
+  factor_attribution_json: FactorAttribution[];
+  generated_at: string;
+}
+
+export interface ConfidenceBucket {
+  total: number;
+  correct: number;
+  accuracy: number; // 0〜1
+}
+
+export interface WeeklyReflection {
+  id: string;
+  week: string;                // 'YYYY-Www'
+  period_start: string;
+  period_end: string;
+  total: number;
+  correct: number;
+  accuracy: number;
+  confidence_breakdown_json: Record<string, ConfidenceBucket>;
+  weekly_summary: string;
+  patterns_found_json: string[];
+  improvement_suggestions_json: string[];
+  next_week_focus: string;
+  generated_at: string;
+}
+
+export interface WeightAdjustmentProposal {
+  key: keyof WeightSet;
+  current: number;
+  proposed: number;
+  rationale: string;
+}
+
+export interface MonthlyReflection {
+  id: string;
+  month: string;               // 'YYYY-MM'
+  period_start: string;
+  period_end: string;
+  total: number;
+  correct: number;
+  accuracy: number;
+  trends_json: {
+    by_tournament: Record<string, ConfidenceBucket>;
+    by_player: Record<string, ConfidenceBucket>;
+    by_opening: Record<string, ConfidenceBucket>;
+    accuracy_timeline: { date: string; accuracy: number; total: number }[];
+  };
+  weight_adjustment_proposals_json: WeightAdjustmentProposal[];
+  approved_changes_json: WeightSet | null;
+  approval_status: "pending" | "approved" | "rejected";
+  approved_at: string | null;
+  generated_at: string;
+}
+
+export interface WeaknessPattern {
+  id: string;
+  pattern_key: string;
+  description: string | null;
+  total_attempts: number;
+  miss_count: number;
+  confidence_penalty: number;  // 0〜2
+  last_updated: string;
+  notes: string | null;
+}
+
+export interface BacktestResult {
+  id: string;
+  proposed_weights_json: WeightSet;
+  baseline_weights_json: WeightSet;
+  period_start: string;
+  period_end: string;
+  sample_size: number;
+  current_accuracy: number;
+  projected_accuracy: number;
+  delta: number;
+  decision: "pending" | "approved" | "rejected";
+  note: string | null;
+  tested_at: string;
+}
+
 // supabase-js generic 用の最小スキーマ
 export interface Database {
   shogi_edge: {
@@ -237,6 +339,31 @@ export interface Database {
         Row: AmateurResult;
         Insert: Partial<AmateurResult>;
         Update: Partial<AmateurResult>;
+      };
+      match_reflections: {
+        Row: MatchReflection;
+        Insert: Partial<MatchReflection>;
+        Update: Partial<MatchReflection>;
+      };
+      weekly_reflections: {
+        Row: WeeklyReflection;
+        Insert: Partial<WeeklyReflection>;
+        Update: Partial<WeeklyReflection>;
+      };
+      monthly_reflections: {
+        Row: MonthlyReflection;
+        Insert: Partial<MonthlyReflection>;
+        Update: Partial<MonthlyReflection>;
+      };
+      weakness_patterns: {
+        Row: WeaknessPattern;
+        Insert: Partial<WeaknessPattern>;
+        Update: Partial<WeaknessPattern>;
+      };
+      backtest_results: {
+        Row: BacktestResult;
+        Insert: Partial<BacktestResult>;
+        Update: Partial<BacktestResult>;
       };
     };
     Views: object;
