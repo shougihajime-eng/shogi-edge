@@ -205,8 +205,19 @@ export async function POST(req: Request) {
     .from("player_openings")
     .upsert(openingRows, { onConflict: "player_id,opening,side" });
 
-  // 1d. head_to_head (シード値) — 主要対戦カードに分布
-  const h2hPairs: { a: string; b: string; aWins: number; bWins: number; openings: string[] }[] = [
+  // 1d. head_to_head (合成シード値) — Wikipedia由来データ (data/head_to_head_wikipedia.csv) を
+  //     `node scripts/import-wiki-h2h.mjs` で投入済みなら、この合成データは挿入しない
+  //     既存に1件でも非「シード対戦履歴」のリアルデータがあれば skip
+  const { count: realH2hCount } = await admin
+    .from("head_to_head")
+    .select("*", { count: "exact", head: true })
+    .neq("tournament", "シード対戦履歴");
+  if ((realH2hCount ?? 0) > 0) {
+    // リアルデータあり → 合成データは削除して終了
+    await admin.from("head_to_head").delete().eq("tournament", "シード対戦履歴");
+  } else {
+    // リアルデータなし → 合成シードを投入 (新規環境向け)
+    const h2hPairs: { a: string; b: string; aWins: number; bWins: number; openings: string[] }[] = [
     { a: "藤井聡太", b: "永瀬拓矢", aWins: 14, bWins: 6, openings: ["kakugawari", "ai_kakari", "yagura"] },
     { a: "藤井聡太", b: "渡辺明", aWins: 12, bWins: 5, openings: ["kakugawari", "ai_kakari"] },
     { a: "藤井聡太", b: "豊島将之", aWins: 10, bWins: 4, openings: ["ai_kakari", "kakugawari", "yokofudori"] },
@@ -256,11 +267,12 @@ export async function POST(req: Request) {
       dateCursor = new Date(dateCursor.getTime() + 18 * 86400000);
     }
   }
-  // 重複防止: 既に「シード対戦履歴」がある場合は全削除して入れ直し
-  await admin.from("head_to_head").delete().eq("tournament", "シード対戦履歴");
-  if (h2hRows.length > 0) {
-    await admin.from("head_to_head").insert(h2hRows);
-  }
+    // 重複防止: 既に「シード対戦履歴」がある場合は全削除して入れ直し
+    await admin.from("head_to_head").delete().eq("tournament", "シード対戦履歴");
+    if (h2hRows.length > 0) {
+      await admin.from("head_to_head").insert(h2hRows);
+    }
+  } // end else (リアルデータなしの新規環境向けシード)
 
   // 1e. 公知のタイトル戦・大型棋戦 結果 (2020-2025)
   //     ※ 各シリーズの「決着結果」を代表 1 局として記録。月日は決着月の代表日。
@@ -419,7 +431,7 @@ export async function POST(req: Request) {
     matches: results.length,
     predictions: results,
     title_h2h_inserted: titleRows.length,
-    title_tournaments: titleTournaments,
+    title_tournaments: Array.from(new Set(titleResults.map((t) => t.tournament))),
   });
 }
 
