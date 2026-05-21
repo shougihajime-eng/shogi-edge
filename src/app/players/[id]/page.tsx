@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/client";
 import { PageShell } from "@/components/PageShell";
 import { PlayerStatsPanel } from "@/components/PlayerStatsPanel";
+import { RatingHistoryChart } from "@/components/RatingHistoryChart";
 import type { Player, PlayerOpening, PlayerStats, HeadToHead, Match } from "@/types/db";
 import { formatDateJa } from "@/lib/utils";
 
@@ -34,35 +35,54 @@ export default async function PlayerPage({
   if (!pRaw) notFound();
   const player = pRaw as unknown as Player;
 
-  const [{ data: statsRaw }, { data: openingsRaw }, { data: h2hRaw }, { data: upcomingRaw }] =
-    await Promise.all([
-      sb
-        .from("player_stats")
-        .select("*")
-        .eq("player_id", id)
-        .order("snapshot_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      sb.from("player_openings").select("*").eq("player_id", id),
-      sb
-        .from("head_to_head")
-        .select("*")
-        .or(`player_a_id.eq.${id},player_b_id.eq.${id}`)
-        .order("match_date", { ascending: false })
-        .limit(20),
-      sb
-        .from("matches")
-        .select("*")
-        .or(`player_a_id.eq.${id},player_b_id.eq.${id}`)
-        .gte("match_date", new Date().toISOString().slice(0, 10))
-        .order("match_date", { ascending: true })
-        .limit(5),
-    ]);
+  const [
+    { data: statsRaw },
+    { data: statsHistoryRaw },
+    { data: openingsRaw },
+    { data: h2hRaw },
+    { data: upcomingRaw },
+  ] = await Promise.all([
+    sb
+      .from("player_stats")
+      .select("*")
+      .eq("player_id", id)
+      .order("snapshot_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    sb
+      .from("player_stats")
+      .select("snapshot_date")
+      .eq("player_id", id)
+      .order("snapshot_date", { ascending: true })
+      .limit(50),
+    sb.from("player_openings").select("*").eq("player_id", id),
+    sb
+      .from("head_to_head")
+      .select("*")
+      .or(`player_a_id.eq.${id},player_b_id.eq.${id}`)
+      .order("match_date", { ascending: false })
+      .limit(20),
+    sb
+      .from("matches")
+      .select("*")
+      .or(`player_a_id.eq.${id},player_b_id.eq.${id}`)
+      .gte("match_date", new Date().toISOString().slice(0, 10))
+      .order("match_date", { ascending: true })
+      .limit(5),
+  ]);
 
   const stats = (statsRaw as unknown as PlayerStats) ?? null;
   const openings = ((openingsRaw ?? []) as unknown as PlayerOpening[]) ?? [];
   const h2h = ((h2hRaw ?? []) as unknown as HeadToHead[]) ?? [];
   const upcoming = ((upcomingRaw ?? []) as unknown as Match[]) ?? [];
+
+  // レーティング履歴: スナップショット日付ごとに player.rating の値を引きたいが、
+  // 現状 player_stats に rating カラムは無いので、現在値だけを表示する設計。
+  // 将来は player_stats に rating snapshot を持たせる想定。今はスタブ。
+  const ratingHistory = ((statsHistoryRaw ?? []) as { snapshot_date: string }[]).map((s) => ({
+    date: s.snapshot_date,
+    rating: player.rating, // TODO: スナップショット時点の rating を持たせる
+  }));
 
   // 戦型集計
   const opensAgg = aggregateOpenings(openings);
@@ -78,6 +98,10 @@ export default async function PlayerPage({
       <header className="mb-8">
         <PlayerStatsPanel player={player} stats={stats} side="left" />
       </header>
+
+      <div className="mb-6">
+        <RatingHistoryChart data={ratingHistory} currentRating={player.rating} />
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <section className="rounded-2xl border border-washi-100/8 bg-sumi-900/60 p-5">
