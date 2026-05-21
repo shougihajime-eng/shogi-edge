@@ -1,32 +1,40 @@
 import { NextResponse } from "next/server";
+import { isScraperEnabled, lookupScraper } from "./registry";
 
 // =============================================================
 // B 層スクレイパー共通テンプレート
-// 各サイトの規約 (robots.txt / 利用規約) を確認するまでは ENABLED=false で運用
+// 各サイトは registry.ts に登録されており、envVarName="true" で有効化
 // レート制限: 1秒1リクエスト以下
 // User-Agent: 明示 ("ShogiEdgeBot/0.1 (+contact: shougi.hajime@gmail.com)")
 // =============================================================
 
-export interface ScraperContext {
-  siteKey: string;          // 'shogi-or-jp' など
-  siteName: string;         // '日本将棋連盟 公式 対局スケジュール'
-  url: string;              // 取得元 URL
-  enabled: boolean;         // 規約確認まで false 固定
-  note: string;             // 規約確認のメモ
-}
-
 const USER_AGENT =
   "ShogiEdgeBot/0.1 (Shogi Edge prediction app; contact shougi.hajime@gmail.com)";
 
+export interface ScraperContext {
+  siteKey: string;       // registry.ts のキー
+  // 旧 API 互換 (siteName/url/enabled/note は registry から引く)
+  siteName?: string;
+  url?: string;
+  enabled?: boolean;     // 旧: const ENABLED. registry の env var で上書きされる
+  note?: string;
+}
+
 export function buildScraperHandler(ctx: ScraperContext) {
   return async function GET(req: Request) {
-    if (!ctx.enabled) {
+    const entry = lookupScraper(ctx.siteKey);
+    const enabled = isScraperEnabled(ctx.siteKey);
+
+    if (!enabled) {
       return NextResponse.json(
         {
           enabled: false,
           site: ctx.siteKey,
-          message: `${ctx.siteName} スクレイパーは現在 OFF です。${ctx.note}`,
-          docs: ctx.url,
+          message: `${entry?.siteName ?? ctx.siteName ?? ctx.siteKey} スクレイパーは現在 OFF です。${entry?.note ?? ctx.note ?? ""}`,
+          docs: entry?.url ?? ctx.url,
+          how_to_enable: entry
+            ? `Vercel ダッシュボード → Environment Variables で ${entry.envVarName}=true を追加 → Redeploy`
+            : undefined,
         },
         { status: 200 },
       );
