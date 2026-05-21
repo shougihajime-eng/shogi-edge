@@ -38,6 +38,21 @@ export default function ScraperStatusPage() {
         )。
       </p>
 
+      <section className="mb-6 rounded-2xl border border-kincha-500/30 bg-kincha-500/5 p-5">
+        <h2 className="mb-2 font-serif text-lg text-kincha-300">
+          ✅ 代替: Wikipedia 自動同期 (毎週稼働中)
+        </h2>
+        <p className="text-xs text-washi-200">
+          下記の B層は規約 OFF のままですが、
+          <strong>
+            <Link href="/admin/wiki-sync" className="underline hover:text-kincha-200">
+              Wikipedia 同期 (CC-BY-SA で合法)
+            </Link>
+          </strong>{" "}
+          が毎週月曜 03:00 JST に走っており、現役棋士の段位・出身・師匠・生年月日を最新化しています。
+        </p>
+      </section>
+
       <section className="mb-8 rounded-2xl border border-shu-500/30 bg-shu-500/5 p-5">
         <h2 className="mb-2 font-serif text-lg">📋 推奨順序 (1サイトずつ確認しながら)</h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-washi-200">

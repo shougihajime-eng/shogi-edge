@@ -306,17 +306,24 @@ export async function POST(req: Request) {
     { date: "2025-03-21", tournament: "王将戦", a: "藤井聡太", b: "永瀬拓矢", winner: "藤井聡太" },
   ];
 
-  // 公知タイトル戦の名前で「重複防止」: tournament が上記リストの棋戦名なら全削除
-  const titleTournaments = Array.from(new Set(titleResults.map((t) => t.tournament)));
-  for (const tname of titleTournaments) {
-    await admin.from("head_to_head").delete().eq("tournament", tname);
-  }
+  // 重複防止: 同じ (date, a, b, tournament) があれば skip
+  // (data/head_to_head_wikipedia.csv の Wikipedia 由来データを壊さない)
+  const existingTitle = await admin
+    .from("head_to_head")
+    .select("player_a_id, player_b_id, match_date, tournament");
+  const existSet = new Set(
+    ((existingTitle.data ?? []) as { player_a_id: string; player_b_id: string; match_date: string; tournament: string | null }[])
+      .map((e) => `${e.player_a_id}|${e.player_b_id}|${e.match_date}|${e.tournament}`),
+  );
   const titleRows = titleResults
     .map((t) => {
       const aId = pmap.get(t.a);
       const bId = pmap.get(t.b);
       const wId = pmap.get(t.winner);
       if (!aId || !bId || !wId) return null;
+      const key1 = `${aId}|${bId}|${t.date}|${t.tournament}`;
+      const key2 = `${bId}|${aId}|${t.date}|${t.tournament}`;
+      if (existSet.has(key1) || existSet.has(key2)) return null;
       return {
         player_a_id: aId,
         player_b_id: bId,

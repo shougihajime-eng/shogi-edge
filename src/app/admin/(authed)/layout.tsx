@@ -13,6 +13,7 @@ const nav = [
   { href: "/admin/reflections", label: "振り返り" },
   { href: "/admin/amateurs", label: "アマ選手" },
   { href: "/admin/import", label: "CSV一括取込" },
+  { href: "/admin/wiki-sync", label: "Wikipedia 同期" },
   { href: "/admin/scraper-status", label: "自動取得状況" },
 ];
 

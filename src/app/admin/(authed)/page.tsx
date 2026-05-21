@@ -108,11 +108,11 @@ function SystemStatusPanel({ aiKeySet }: { aiKeySet: boolean }) {
           }
         />
         <StatusItem
-          label="自動取得 (B層スクレイパー)"
-          ok={false}
-          okText="-"
-          ngText="全 OFF (規約OK確認後に有効化)"
-          help="`/admin/scraper-status` で詳細"
+          label="Wikipedia 自動同期"
+          ok={true}
+          okText="毎週月曜 03:00 JST"
+          ngText="未稼働"
+          help="`/admin/wiki-sync` で手動実行 + 履歴 (CC-BY-SA で合法)"
         />
         <StatusItem
           label="自己学習 cron"
