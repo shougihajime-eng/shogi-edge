@@ -1,26 +1,115 @@
 @import "tailwindcss";
 
+@theme {
+  --color-sumi-950: #07070a;
+  --color-sumi-900: #0e0e10;
+  --color-sumi-800: #16161a;
+  --color-sumi-700: #1f1f24;
+  --color-sumi-600: #2a2a31;
+  --color-sumi-500: #3b3b45;
+  --color-sumi-400: #6b6b76;
+  --color-sumi-300: #9a9aa3;
+  --color-sumi-200: #c3c3c9;
+  --color-sumi-100: #e2e2e5;
+
+  --color-washi-50: #faf7ef;
+  --color-washi-100: #f5f1e8;
+  --color-washi-200: #ede6d3;
+  --color-washi-300: #ddd2b4;
+  --color-washi-400: #c4b48a;
+  --color-washi-500: #ab9560;
+
+  --color-shu-300: #f0a4ad;
+  --color-shu-400: #df6470;
+  --color-shu-500: #c8102e;
+  --color-shu-600: #a40d24;
+
+  --color-ai-300: #6a8aad;
+  --color-ai-500: #2d4f78;
+  --color-ai-700: #1b3a5c;
+  --color-ai-900: #0e2238;
+
+  --color-kincha-400: #d4a73f;
+  --color-kincha-500: #b8860b;
+  --color-kincha-600: #966c05;
+
+  --font-sans: var(--font-noto-sans), system-ui, sans-serif;
+  --font-serif: var(--font-noto-serif), Georgia, serif;
+  --font-mono: var(--font-mono-jb), "JetBrains Mono", ui-monospace, monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --background: var(--color-sumi-950);
+  --foreground: var(--color-washi-100);
+  --border: rgba(245, 241, 232, 0.08);
+  --muted: var(--color-sumi-400);
+  --accent: var(--color-shu-500);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  border-color: var(--border);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--background);
+  color: var(--foreground);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "palt" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 将棋盤グリッドの薄い背景(超控えめ) */
+.bg-board-grid {
+  background-image:
+    linear-gradient(to right, rgba(245, 241, 232, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 241, 232, 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* 数字は等幅 (棋士名は明朝、本文はサンセリフ) */
+.font-num {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+.font-name {
+  font-family: var(--font-serif);
+  letter-spacing: 0.02em;
+}
+
+/* スクロールバーをミニマル */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-sumi-700);
+  border-radius: 3px;
+}
+
+/* 駒イージング (控えめ) */
+@keyframes piece-slide {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.piece-in {
+  animation: piece-slide 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+/* hairline border helper */
+.hairline {
+  border: 1px solid rgba(245, 241, 232, 0.08);
+}
+.hairline-strong {
+  border: 1px solid rgba(245, 241, 232, 0.15);
 }
