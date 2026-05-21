@@ -2,10 +2,12 @@
 // /api/seed-demo
 //
 // 一回だけ実行するシード用エンドポイント。
-//   - 公開情報レベルのプロ棋士 6 名を upsert
-//   - 1 件のデモ対局 (1週間先) を作成
-//   - 予想を生成 (信頼度は★1〜2 想定 — h2h/成績データが空のため意図通り)
+//   - プロ棋士 20 名を upsert (公開情報レベルの基本情報のみ)
+//   - 各棋士の player_stats / player_openings をシード値で投入
+//   - 主要ペア間の head_to_head をシード値で投入
+//   - 5 件のデモ対局 (1週間先) を作成 + 予想生成
 //
+// すべて「シード値・要更新」の扱い。管理画面の CSV 取込で正確な値に差し替えてください。
 // 認証: x-admin-password ヘッダで .env の ADMIN_PASSWORD と照合
 // =============================================================
 
@@ -79,6 +81,151 @@ export async function POST(req: Request) {
   const nagase = pmap.get("永瀬拓矢");
   if (!fujii || !nagase) {
     return NextResponse.json({ error: "seed players not retrievable" }, { status: 500 });
+  }
+
+  // 1b. player_stats を投入 (シード値)
+  //   * 直近1ヶ月: トップ層 (R1850+) は 6〜9勝 1〜3敗、中堅 (R1700-1850) は 4〜6勝 3〜5敗
+  //   * 先手後手も同様の比率で按分
+  //   * snapshot_date = 今日。再シードは upsert で更新
+  const today = new Date().toISOString().slice(0, 10);
+  const statsRows = PLAYERS.map((p) => {
+    const tier = p.rating >= 1900 ? "top" : p.rating >= 1800 ? "high" : p.rating >= 1700 ? "mid" : "low";
+    const tmpl =
+      tier === "top"
+        ? { r1m: [9, 1], r3m: [22, 5], r1y: [70, 18], total: [400, 110], season: [22, 6], streak: 4, sente: [0.7, 0.75], gote: [0.65, 0.7] }
+        : tier === "high"
+          ? { r1m: [7, 3], r3m: [18, 9], r1y: [55, 30], total: [350, 200], season: [18, 9], streak: 2, sente: [0.6, 0.65], gote: [0.55, 0.6] }
+          : tier === "mid"
+            ? { r1m: [5, 4], r3m: [14, 12], r1y: [42, 38], total: [280, 240], season: [14, 12], streak: 1, sente: [0.55, 0.6], gote: [0.5, 0.55] }
+            : { r1m: [4, 5], r3m: [11, 14], r1y: [38, 42], total: [220, 230], season: [11, 14], streak: -1, sente: [0.5, 0.55], gote: [0.45, 0.5] };
+    return {
+      player_id: pmap.get(p.name),
+      snapshot_date: today,
+      total_wins: tmpl.total[0],
+      total_losses: tmpl.total[1],
+      recent_1m_wins: tmpl.r1m[0],
+      recent_1m_losses: tmpl.r1m[1],
+      recent_3m_wins: tmpl.r3m[0],
+      recent_3m_losses: tmpl.r3m[1],
+      recent_1y_wins: tmpl.r1y[0],
+      recent_1y_losses: tmpl.r1y[1],
+      season_wins: tmpl.season[0],
+      season_losses: tmpl.season[1],
+      current_streak: tmpl.streak,
+      sente_wins: Math.round(tmpl.total[0] * tmpl.sente[0] * 0.55),
+      sente_losses: Math.round(tmpl.total[1] * 0.5),
+      gote_wins: Math.round(tmpl.total[0] * tmpl.gote[0] * 0.55),
+      gote_losses: Math.round(tmpl.total[1] * 0.5),
+      sennichite_count: 0,
+      jishogi_count: 0,
+    };
+  });
+  await admin
+    .from("player_stats")
+    .upsert(statsRows, { onConflict: "player_id,snapshot_date" });
+
+  // 1c. player_openings (シード値・戦型傾向)
+  //   居飛車党: ai_kakari/kakugawari/yagura が主力
+  //   振り飛車党 (菅井): shikenbisha/gokigen が主力
+  const isFurigoma = new Set(["菅井竜也"]);
+  const isAttacker = new Set(["藤井聡太", "永瀬拓矢", "渡辺明", "豊島将之", "羽生善治", "伊藤匠"]); // 攻撃的居飛車党 = 角換わり多め
+  const openingRows: {
+    player_id: string;
+    opening: string;
+    side: "sente" | "gote" | null;
+    wins: number;
+    losses: number;
+  }[] = [];
+  for (const p of PLAYERS) {
+    const pid = pmap.get(p.name);
+    if (!pid) continue;
+    const tier = p.rating >= 1900 ? 1.0 : p.rating >= 1800 ? 0.85 : p.rating >= 1700 ? 0.7 : 0.55;
+    const base = (w: number, l: number) => ({
+      wins: Math.max(1, Math.round(w * tier)),
+      losses: Math.max(1, Math.round(l * (2 - tier))),
+    });
+    if (isFurigoma.has(p.name)) {
+      openingRows.push(
+        { player_id: pid, opening: "shikenbisha", side: null, ...base(18, 9) },
+        { player_id: pid, opening: "gokigen", side: null, ...base(12, 6) },
+        { player_id: pid, opening: "sankenbisha", side: null, ...base(8, 5) },
+        { player_id: pid, opening: "ai_kakari", side: null, ...base(3, 3) },
+      );
+    } else if (isAttacker.has(p.name)) {
+      openingRows.push(
+        { player_id: pid, opening: "kakugawari", side: null, ...base(22, 8) },
+        { player_id: pid, opening: "ai_kakari", side: null, ...base(15, 7) },
+        { player_id: pid, opening: "yagura", side: null, ...base(8, 5) },
+        { player_id: pid, opening: "yokofudori", side: null, ...base(5, 3) },
+      );
+    } else {
+      openingRows.push(
+        { player_id: pid, opening: "ai_kakari", side: null, ...base(12, 8) },
+        { player_id: pid, opening: "kakugawari", side: null, ...base(10, 8) },
+        { player_id: pid, opening: "yagura", side: null, ...base(8, 6) },
+        { player_id: pid, opening: "shikenbisha", side: null, ...base(4, 4) },
+      );
+    }
+  }
+  await admin
+    .from("player_openings")
+    .upsert(openingRows, { onConflict: "player_id,opening,side" });
+
+  // 1d. head_to_head (シード値) — 主要対戦カードに分布
+  const h2hPairs: { a: string; b: string; aWins: number; bWins: number; openings: string[] }[] = [
+    { a: "藤井聡太", b: "永瀬拓矢", aWins: 14, bWins: 6, openings: ["kakugawari", "ai_kakari", "yagura"] },
+    { a: "藤井聡太", b: "渡辺明", aWins: 12, bWins: 5, openings: ["kakugawari", "ai_kakari"] },
+    { a: "藤井聡太", b: "豊島将之", aWins: 10, bWins: 4, openings: ["ai_kakari", "kakugawari", "yokofudori"] },
+    { a: "藤井聡太", b: "羽生善治", aWins: 6, bWins: 3, openings: ["ai_kakari", "kakugawari"] },
+    { a: "藤井聡太", b: "伊藤匠", aWins: 4, bWins: 3, openings: ["kakugawari"] },
+    { a: "永瀬拓矢", b: "渡辺明", aWins: 5, bWins: 4, openings: ["ai_kakari", "yagura"] },
+    { a: "永瀬拓矢", b: "豊島将之", aWins: 4, bWins: 5, openings: ["kakugawari", "yagura"] },
+    { a: "渡辺明", b: "豊島将之", aWins: 6, bWins: 7, openings: ["kakugawari", "ai_kakari"] },
+    { a: "羽生善治", b: "渡辺明", aWins: 8, bWins: 12, openings: ["yagura", "kakugawari"] },
+    { a: "菅井竜也", b: "羽生善治", aWins: 3, bWins: 4, openings: ["shikenbisha", "gokigen"] },
+    { a: "豊島将之", b: "山崎隆之", aWins: 5, bWins: 2, openings: ["ai_kakari", "kakugawari"] },
+    { a: "佐々木勇気", b: "伊藤匠", aWins: 3, bWins: 4, openings: ["kakugawari", "ai_kakari"] },
+  ];
+  const h2hRows: {
+    player_a_id: string;
+    player_b_id: string;
+    match_date: string;
+    tournament: string;
+    opening: string;
+    winner_id: string;
+  }[] = [];
+  let dateCursor = new Date(Date.UTC(2024, 0, 10));
+  for (const pair of h2hPairs) {
+    const aId = pmap.get(pair.a);
+    const bId = pmap.get(pair.b);
+    if (!aId || !bId) continue;
+    for (let i = 0; i < pair.aWins; i++) {
+      h2hRows.push({
+        player_a_id: aId,
+        player_b_id: bId,
+        match_date: dateCursor.toISOString().slice(0, 10),
+        tournament: "シード対戦履歴",
+        opening: pair.openings[i % pair.openings.length],
+        winner_id: aId,
+      });
+      dateCursor = new Date(dateCursor.getTime() + 18 * 86400000);
+    }
+    for (let i = 0; i < pair.bWins; i++) {
+      h2hRows.push({
+        player_a_id: aId,
+        player_b_id: bId,
+        match_date: dateCursor.toISOString().slice(0, 10),
+        tournament: "シード対戦履歴",
+        opening: pair.openings[i % pair.openings.length],
+        winner_id: bId,
+      });
+      dateCursor = new Date(dateCursor.getTime() + 18 * 86400000);
+    }
+  }
+  // 重複防止: 既に「シード対戦履歴」がある場合は全削除して入れ直し
+  await admin.from("head_to_head").delete().eq("tournament", "シード対戦履歴");
+  if (h2hRows.length > 0) {
+    await admin.from("head_to_head").insert(h2hRows);
   }
 
   // 2. デモ対局を複数作成 (or 再シード時はスキップ)
