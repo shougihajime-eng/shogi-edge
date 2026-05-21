@@ -52,6 +52,40 @@ const PLAYERS: SeedPlayer[] = [
   { name: "増田康宏", kanji_name: "増田康宏", rank: "七段", region: "tokyo", master: "森下卓", rating: 1730, notes: "シード(2026-05)" },
   { name: "高見泰地", kanji_name: "高見泰地", rank: "七段", region: "tokyo", master: "石田和雄", rating: 1670, notes: "シード(2026-05)" },
   { name: "屋敷伸之", kanji_name: "屋敷伸之", rank: "九段", region: "tokyo", master: "花村元司", rating: 1690, notes: "シード(2026-05)" },
+
+  // ---- 拡張シード (2026-05-22 追加) ----
+  // 段位・レーティング・師匠は公開情報ベースだが、最新では変わっている可能性があるので
+  // /admin/players で随時更新してください。漢字表記は連盟公式準拠。
+  { name: "久保利明", kanji_name: "久保利明", rank: "九段", region: "kansai", master: "淡路仁茂", rating: 1500, notes: "シード(2026-05) 振り飛車党・要段位確認" },
+  { name: "木村一基", kanji_name: "木村一基", rank: "九段", region: "tokyo", master: "佐瀬勇次", rating: 1500, notes: "シード(2026-05) 元王位・要段位確認" },
+  { name: "深浦康市", kanji_name: "深浦康市", rank: "九段", region: "tokyo", master: "花村元司", rating: 1500, notes: "シード(2026-05) 元王位・要段位確認" },
+  { name: "郷田真隆", kanji_name: "郷田真隆", rank: "九段", region: "tokyo", master: "大友昇", rating: 1500, notes: "シード(2026-05) タイトル経験者・要段位確認" },
+  { name: "丸山忠久", kanji_name: "丸山忠久", rank: "九段", region: "tokyo", master: "佐瀬勇次", rating: 1500, notes: "シード(2026-05) 元名人・要段位確認" },
+  { name: "佐藤康光", kanji_name: "佐藤康光", rank: "九段", region: "tokyo", master: "田中魁秀", rating: 1500, notes: "シード(2026-05) 永世棋聖・要段位確認" },
+  { name: "森内俊之", kanji_name: "森内俊之", rank: "九段", region: "tokyo", master: "勝浦修", rating: 1500, notes: "シード(2026-05) 18世名人資格・要段位確認" },
+  { name: "三浦弘行", kanji_name: "三浦弘行", rank: "九段", region: "tokyo", master: "西村一義", rating: 1500, notes: "シード(2026-05) A級経験者・要段位確認" },
+  { name: "行方尚史", kanji_name: "行方尚史", rank: "九段", region: "tokyo", master: "大山康晴", rating: 1500, notes: "シード(2026-05) A級経験者・要段位確認" },
+  { name: "阿久津主税", kanji_name: "阿久津主税", rank: "八段", region: "tokyo", master: "石田和雄", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "戸辺誠", kanji_name: "戸辺誠", rank: "七段", region: "tokyo", master: "石田和雄", rating: 1500, notes: "シード(2026-05) 振り飛車党・要段位確認" },
+  { name: "西尾明", kanji_name: "西尾明", rank: "七段", region: "tokyo", master: "宮田利男", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "大橋貴洸", kanji_name: "大橋貴洸", rank: "七段", region: "tokyo", master: "所司和晴", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "八代弥", kanji_name: "八代弥", rank: "七段", region: "tokyo", master: "井上慶太", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "都成竜馬", kanji_name: "都成竜馬", rank: "七段", region: "tokyo", master: "谷川浩司", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "佐々木大地", kanji_name: "佐々木大地", rank: "七段", region: "tokyo", master: "深浦康市", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "出口若武", kanji_name: "出口若武", rank: "六段", region: "kansai", master: "井上慶太", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "服部慎一郎", kanji_name: "服部慎一郎", rank: "六段", region: "kansai", master: "豊川孝弘", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "古賀悠聖", kanji_name: "古賀悠聖", rank: "六段", region: "tokyo", master: "井上慶太", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "高田明浩", kanji_name: "高田明浩", rank: "五段", region: "kansai", master: "森信雄", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "渡辺和史", kanji_name: "渡辺和史", rank: "六段", region: "tokyo", master: "石田和雄", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "池永天志", kanji_name: "池永天志", rank: "六段", region: "kansai", master: "森信雄", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "本田奎", kanji_name: "本田奎", rank: "六段", region: "tokyo", master: "宮田利男", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "杉本和陽", kanji_name: "杉本和陽", rank: "五段", region: "tokyo", master: "高橋道雄", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "西田拓也", kanji_name: "西田拓也", rank: "五段", region: "kansai", master: "森信雄", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "黒田尭之", kanji_name: "黒田尭之", rank: "五段", region: "kansai", master: "井上慶太", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "横山泰明", kanji_name: "横山泰明", rank: "七段", region: "tokyo", master: "勝浦修", rating: 1500, notes: "シード(2026-05) 要段位確認" },
+  { name: "藤本渚", kanji_name: "藤本渚", rank: "五段", region: "kansai", master: "井上慶太", rating: 1500, notes: "シード(2026-05) 若手・要段位確認" },
+  { name: "上野裕寿", kanji_name: "上野裕寿", rank: "四段", region: "tokyo", master: "森下卓", rating: 1500, notes: "シード(2026-05) 若手・要段位確認" },
+  { name: "藤森哲也", kanji_name: "藤森哲也", rank: "五段", region: "tokyo", master: "森信雄", rating: 1500, notes: "シード(2026-05) 要段位確認" },
 ];
 
 export async function POST(req: Request) {
