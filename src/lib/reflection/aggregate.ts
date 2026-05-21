@@ -139,10 +139,12 @@ async function loadPeriodData(periodStart: string, periodEnd: string): Promise<P
     m[key].accuracy = m[key].correct / m[key].total;
   };
 
-  // 各試合: 最新の prediction だけ評価対象
+  // 各試合: 「結果が紐付いている prediction の中で最新のもの」を評価対象にする
+  // (finalize 後に再シードで新規 prediction が生まれた場合、それは結果なしなので除外)
   const matchMap = new Map(matches.map((m) => [m.id, m]));
   const latestByMatch = new Map<string, Prediction>();
   for (const p of preds) {
+    if (!resultMap.has(p.id)) continue; // 結果未紐付けの予想はスキップ
     const cur = latestByMatch.get(p.match_id);
     if (!cur || new Date(p.created_at) > new Date(cur.created_at)) {
       latestByMatch.set(p.match_id, p);
