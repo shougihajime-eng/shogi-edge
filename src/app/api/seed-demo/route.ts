@@ -262,6 +262,76 @@ export async function POST(req: Request) {
     await admin.from("head_to_head").insert(h2hRows);
   }
 
+  // 1e. 公知のタイトル戦・大型棋戦 結果 (2020-2025)
+  //     ※ 各シリーズの「決着結果」を代表 1 局として記録。月日は決着月の代表日。
+  //     ※ 戦型は対局ごとに違うことが多いので null (戦型相性への影響を歪めない)
+  //     ※ tournament 名は連盟公式表記の棋戦名。「シード対戦履歴」とは別管理なので
+  //        後から /admin/head-to-head で局単位の正確な記録に差し替えて OK
+  type TitleH2H = {
+    date: string;
+    tournament: string;
+    a: string;
+    b: string;
+    winner: string;
+    note?: string;
+  };
+  const titleResults: TitleH2H[] = [
+    // 棋聖戦
+    { date: "2020-07-16", tournament: "棋聖戦", a: "渡辺明", b: "藤井聡太", winner: "藤井聡太", note: "藤井 初タイトル獲得" },
+    // 王位戦
+    { date: "2020-08-20", tournament: "王位戦", a: "木村一基", b: "藤井聡太", winner: "藤井聡太", note: "藤井 2冠" },
+    // 叡王戦 (出口・菅井・伊藤)
+    { date: "2022-05-24", tournament: "叡王戦", a: "藤井聡太", b: "出口若武", winner: "藤井聡太" },
+    { date: "2023-06-01", tournament: "叡王戦", a: "藤井聡太", b: "菅井竜也", winner: "藤井聡太" },
+    { date: "2024-06-20", tournament: "叡王戦", a: "藤井聡太", b: "伊藤匠", winner: "伊藤匠", note: "伊藤 初タイトル獲得・藤井連続防衛ストップ" },
+    // 竜王戦
+    { date: "2023-12-04", tournament: "竜王戦", a: "藤井聡太", b: "伊藤匠", winner: "藤井聡太" },
+    { date: "2024-12-04", tournament: "竜王戦", a: "藤井聡太", b: "佐々木勇気", winner: "藤井聡太" },
+    // 名人戦
+    { date: "2023-06-01", tournament: "名人戦", a: "渡辺明", b: "藤井聡太", winner: "藤井聡太", note: "藤井 新名人 (史上最年少名人)" },
+    { date: "2024-06-20", tournament: "名人戦", a: "藤井聡太", b: "豊島将之", winner: "藤井聡太" },
+    // 王位戦 (藤井防衛)
+    { date: "2023-09-08", tournament: "王位戦", a: "藤井聡太", b: "佐々木大地", winner: "藤井聡太" },
+    { date: "2024-09-12", tournament: "王位戦", a: "藤井聡太", b: "渡辺明", winner: "藤井聡太" },
+    // 王座戦
+    { date: "2020-09-22", tournament: "王座戦", a: "永瀬拓矢", b: "藤井聡太", winner: "永瀬拓矢", note: "藤井 初挑戦失敗" },
+    { date: "2023-10-11", tournament: "王座戦", a: "永瀬拓矢", b: "藤井聡太", winner: "藤井聡太", note: "藤井 8冠達成" },
+    { date: "2024-10-31", tournament: "王座戦", a: "藤井聡太", b: "永瀬拓矢", winner: "永瀬拓矢", note: "永瀬 王座奪還・藤井7冠に" },
+    // 棋王戦
+    { date: "2024-03-22", tournament: "棋王戦", a: "渡辺明", b: "藤井聡太", winner: "藤井聡太" },
+    // 王将戦
+    { date: "2022-02-12", tournament: "王将戦", a: "渡辺明", b: "藤井聡太", winner: "藤井聡太", note: "藤井 王将奪取" },
+    { date: "2023-03-12", tournament: "王将戦", a: "藤井聡太", b: "羽生善治", winner: "藤井聡太" },
+    { date: "2024-03-30", tournament: "王将戦", a: "藤井聡太", b: "菅井竜也", winner: "藤井聡太" },
+    { date: "2025-03-21", tournament: "王将戦", a: "藤井聡太", b: "永瀬拓矢", winner: "藤井聡太" },
+  ];
+
+  // 公知タイトル戦の名前で「重複防止」: tournament が上記リストの棋戦名なら全削除
+  const titleTournaments = Array.from(new Set(titleResults.map((t) => t.tournament)));
+  for (const tname of titleTournaments) {
+    await admin.from("head_to_head").delete().eq("tournament", tname);
+  }
+  const titleRows = titleResults
+    .map((t) => {
+      const aId = pmap.get(t.a);
+      const bId = pmap.get(t.b);
+      const wId = pmap.get(t.winner);
+      if (!aId || !bId || !wId) return null;
+      return {
+        player_a_id: aId,
+        player_b_id: bId,
+        match_date: t.date,
+        tournament: t.tournament,
+        opening: null,
+        winner_id: wId,
+        kifu_url: null,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+  if (titleRows.length > 0) {
+    await admin.from("head_to_head").insert(titleRows);
+  }
+
   // 2. デモ対局を複数作成 (or 再シード時はスキップ)
   const demoMatches: {
     daysAhead: number;
@@ -341,6 +411,8 @@ export async function POST(req: Request) {
     players: insertedPlayers?.length ?? 0,
     matches: results.length,
     predictions: results,
+    title_h2h_inserted: titleRows.length,
+    title_tournaments: titleTournaments,
   });
 }
 
