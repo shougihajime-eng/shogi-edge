@@ -5,6 +5,15 @@
 
 create schema if not exists shogi_edge;
 
+-- 権限付与 (Supabase の anon / authenticated / service_role 用)
+grant usage on schema shogi_edge to anon, authenticated, service_role;
+grant all on all tables in schema shogi_edge to anon, authenticated, service_role;
+grant all on all sequences in schema shogi_edge to anon, authenticated, service_role;
+grant all on all functions in schema shogi_edge to anon, authenticated, service_role;
+alter default privileges in schema shogi_edge grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema shogi_edge grant all on sequences to anon, authenticated, service_role;
+alter default privileges in schema shogi_edge grant all on functions to anon, authenticated, service_role;
+
 -- extensions (uuid 生成用)
 create extension if not exists pgcrypto;
 
